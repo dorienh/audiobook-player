@@ -1,0 +1,20 @@
+{
+  "books": [
+    {
+      "id": "mm-fantasy-house-in-the-cerulean-sea-tj-klune",
+      "title": "House In The Cerulean Sea",
+      "author": "Tj Klune",
+      "cover": "covers/mm-fantasy-house-in-the-cerulean-sea-tj-klune.jpg",
+      "chapters": [
+        {
+          "title": "1. mm fantasy house in the cerulean sea tj klune",
+          "file": "https://pub-5f8fdc77adb442808ca9185a34f14e1d.r2.dev/dorien/mm-fantasy--house_in_the_cerulean_sea-tj_klune/._mm-fantasy--house_in_the_cerulean_sea-tj_klune.m4b"
+        },
+        {
+          "title": "2. mm fantasy house in the cerulean sea tj klune",
+          "file": "https://pub-5f8fdc77adb442808ca9185a34f14e1d.r2.dev/dorien/mm-fantasy--house_in_the_cerulean_sea-tj_klune/mm-fantasy--house_in_the_cerulean_sea-tj_klune.m4b"
+        }
+      ]
+    }
+  ]
+}
