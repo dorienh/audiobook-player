@@ -1,130 +1,16 @@
-// Scans ./books/<Book Folder>/*.mp3 and writes manifest.json
-//
-// Audio files are expected to already be uploaded to your R2 bucket,
-// mirroring the same folder structure as ./books (folder name + filename).
-// This script just builds the manifest that points at them.
-//
-// Usage:
-//   node generate-manifest.js
-//   R2_BASE_URL=https://pub-xxxx.r2.dev node generate-manifest.js
-//
-// Or edit R2_BASE_URL below directly instead of using the env var.
-const fs = require('fs');
-const path = require('path');
-
-const R2_BASE_URL = process.env.R2_BASE_URL || 'https://pub-xxxx.r2.dev';
-// Point this at the real folder if it's not the local ./books copy —
-// e.g. your Iruka R2 mount root: BOOKS_DIR=~/.config/iruka/cloud-mounts/Seqai_R2-8C4C3DC0/dorien
-const BOOKS_DIR = process.env.BOOKS_DIR
-  ? process.env.BOOKS_DIR.replace(/^~/, require('os').homedir())
-  : path.join(__dirname, 'books');
-
-const AUDIO_EXT = ['.mp3', '.m4a', '.m4b', '.aac'];
-const IMAGE_EXT = ['.jpg', '.jpeg', '.png', '.webp'];
-
-function naturalSort(a, b){
-  return a.localeCompare(b, undefined, { numeric: true, sensitivity: 'base' });
+{
+  "books": [
+    {
+      "id": "mm-fantasy-house-in-the-cerulean-sea-tj-klune",
+      "title": "House In The Cerulean Sea",
+      "author": "Tj Klune",
+      "cover": "https://pub-5f8fdc77adb442808ca9185a34f14e1d.r2.dev/dorien/mm-fantasy--house_in_the_cerulean_sea-tj_klune/z-house_in_the_cerulean_sea.jpg",
+      "chapters": [
+        {
+          "title": "Full recording",
+          "file": "https://pub-5f8fdc77adb442808ca9185a34f14e1d.r2.dev/dorien/mm-fantasy--house_in_the_cerulean_sea-tj_klune/mm-fantasy--house_in_the_cerulean_sea-tj_klune.m4b"
+        }
+      ]
+    }
+  ]
 }
-
-function slugify(name){
-  return name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '');
-}
-
-function titleFromFilename(file){
-  return path.basename(file, path.extname(file))
-    .replace(/^[\d\s._-]+/, '')   // strip leading track numbers/separators
-    .replace(/[_-]+/g, ' ')
-    .trim() || path.basename(file, path.extname(file));
-}
-
-function titleCase(s){
-  return s.replace(/\w\S*/g, w => w[0].toUpperCase() + w.slice(1));
-}
-
-// Turns "mm-fantasy--house_in_the_cerulean_sea-tj_klune" into
-// { title: "House In The Cerulean Sea", author: "Tj Klune" }.
-// Drop a folder-local meta.json ({ "title": "...", "author": "..." }) to override
-// this guess for any folder where the heuristic gets it wrong.
-function parseFolderName(folder){
-  let rest = folder.replace(/^[a-z0-9]+(?:-[a-z0-9]+)*--/i, ''); // strip leading "tag--"
-  const lastDash = rest.lastIndexOf('-');
-  let title = rest, author = null;
-  if(lastDash > 0){
-    title = rest.slice(0, lastDash);
-    author = rest.slice(lastDash + 1).replace(/_+/g, ' ').trim();
-  }
-  title = title.replace(/_+/g, ' ').trim();
-  return {
-    title: titleCase(title) || folder,
-    author: author ? titleCase(author) : null
-  };
-}
-
-if(!fs.existsSync(BOOKS_DIR)){
-  console.error(`Books folder not found at: ${BOOKS_DIR}`);
-  console.error('Set BOOKS_DIR to point at your book folders (e.g. an R2 mount), or create ./books.');
-  process.exit(1);
-}
-
-const bookFolders = fs.readdirSync(BOOKS_DIR, { withFileTypes: true })
-  .filter(d => d.isDirectory() && !d.name.startsWith('.'))
-  .map(d => d.name)
-  .sort(naturalSort);
-
-if(bookFolders.length === 0){
-  console.error('books/ is empty. Add a subfolder per audiobook, each containing its mp3 files.');
-  process.exit(1);
-}
-
-const books = [];
-
-for(const folder of bookFolders){
-  const full = path.join(BOOKS_DIR, folder);
-  const files = fs.readdirSync(full)
-    .filter(f => !f.startsWith('.'))                          // skip hidden/AppleDouble junk (._foo.m4b, .DS_Store)
-    .filter(f => AUDIO_EXT.includes(path.extname(f).toLowerCase()))
-    .sort(naturalSort);
-
-  if(files.length === 0){
-    console.warn(`Skipping "${folder}" — no audio files found.`);
-    continue;
-  }
-
-  const allFiles = fs.readdirSync(full).filter(f => !f.startsWith('.'));
-  const coverFile = allFiles.find(f => IMAGE_EXT.includes(path.extname(f).toLowerCase()) && /cover|art/i.test(f))
-    || allFiles.find(f => IMAGE_EXT.includes(path.extname(f).toLowerCase()));
-
-  let { title, author } = parseFolderName(folder);
-  const metaPath = path.join(full, 'meta.json');
-  if(fs.existsSync(metaPath)){
-    try{
-      const meta = JSON.parse(fs.readFileSync(metaPath, 'utf8'));
-      if(meta.title) title = meta.title;
-      if(meta.author) author = meta.author;
-    }catch(e){ console.warn(`Couldn't parse meta.json in "${folder}", using guessed title.`); }
-  }
-
-  const encSeg = s => encodeURIComponent(s);
-  const isSingleFile = files.length === 1;
-  const id = slugify(folder);
-
-  books.push({
-    id,
-    title,
-    author,
-    cover: coverFile ? `${R2_BASE_URL}/${encSeg(folder)}/${encSeg(coverFile)}` : null,
-    chapters: files.map((f, i) => ({
-      title: isSingleFile ? 'Full recording' : `${i + 1}. ${titleFromFilename(f)}`,
-      file: `${R2_BASE_URL}/${encSeg(folder)}/${encSeg(f)}`
-    }))
-  });
-
-  console.log(`✓ ${folder} — ${files.length} chapter(s)`);
-}
-
-fs.writeFileSync(
-  path.join(__dirname, 'manifest.json'),
-  JSON.stringify({ books }, null, 2)
-);
-
-console.log(`\nWrote manifest.json with ${books.length} book(s).`);
